@@ -20,6 +20,10 @@ public class PlayerController : MonoBehaviour
     // Particulas de curación
     public GameObject healingEffect;
     public GameObject healingParticles;
+    // Partículas al destruir objetos
+    public GameObject objectDestroyParticles;
+    // Partículas al destruir enemigos
+    public GameObject enemyDestroyParticles;
     void Start()
     {
         //se obtiene el componente de la esfera
@@ -77,7 +81,21 @@ public class PlayerController : MonoBehaviour
         yield return new WaitForSeconds(1f); // espera 1 segundo antes de detener el sistema de particulas
         particlesSystem.Stop();
     }
+    public IEnumerator StopDestroyParticles(GameObject particleObject)
+{
+    yield return new WaitForSeconds(1f);
 
+    if (particleObject != null)
+    {
+        ParticleSystem[] particleSystems =
+            particleObject.GetComponentsInChildren<ParticleSystem>();
+
+        foreach (ParticleSystem ps in particleSystems)
+        {
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
+    }
+}
     void Animar()
     {
         

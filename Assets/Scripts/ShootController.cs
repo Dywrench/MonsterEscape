@@ -1,5 +1,5 @@
 using UnityEngine;
-
+using System.Collections;
 public class ShootController : MonoBehaviour
 {
     
@@ -56,26 +56,79 @@ public class ShootController : MonoBehaviour
 
     void Shoot()
     {
-       Vector3 location = LeftHandShootPoint.position;
+        Vector3 location = LeftHandShootPoint.position;
 
-        timer = 0f; // Se reinicia el temporizador para controlar el tiempo entre disparos
-        gunLine.enabled = true; // Se habilita el componente LineRenderer para dibujar la línea del disparo
-        gunLight.enabled = true; // Se habilita el componente Light para iluminar el disparo
-        shootRay.origin = location; // Se establece el origen del rayo en la posición del disparo
-        shootRay.direction = transform.forward; // Se establece la dirección del rayo hacia adelante desde el objeto que contiene este script
+        timer = 0f;
+        gunLine.enabled = true;
+        gunLight.enabled = true;
 
-        if (Physics.Raycast(shootRay, out shootHit, range, shootableMask)) // Se realiza un raycast para detectar si el rayo impacta con algún objeto disparable dentro del rango especificado
+        shootRay.origin = location;
+        shootRay.direction = transform.forward;
+
+        if (Physics.Raycast(shootRay, out shootHit, range, shootableMask))
         {
-            Destroy(shootHit.collider.gameObject); // Se destruye el objeto impactado por el rayo
-            DrawMagicBeam(location, shootHit.point);// Se establece la posición final de la línea del disparo en el punto de impacto del rayo
+            DrawMagicBeam(location, shootHit.point);
+
+            PlayerController playerController = Player.GetComponent<PlayerController>();
+
+            if (playerController != null)
+            {
+                GameObject particles = null;
+
+                if (shootHit.collider.CompareTag("Enemy"))
+                {
+                    particles = playerController.enemyDestroyParticles;
+                }
+                else
+                {
+                    particles = playerController.objectDestroyParticles;
+                }
+
+                if (particles != null)
+                {
+                    GameObject effect = Instantiate(
+                        particles,
+                        shootHit.point,
+                        Quaternion.identity
+                    );
+
+                    StartCoroutine(
+                        playerController.StopDestroyParticles(effect)
+                    );
+                }
+            }
+            if (shootHit.collider.CompareTag("Enemy"))
+            {
+                Destroy(shootHit.collider.gameObject);
+            }
+            else
+            {
+                StartCoroutine(DestroyObjectWithDelay(shootHit.collider.gameObject));
+            }
         }
-        else //si el rayo no impacta con ningún objeto disparable dentro del rango especificado
+        else
         {
-            Debug.Log("No se impacto con ningun objeto"); // Se imprime un mensaje en la consola indicando que no se impactó con ningún objeto
-            DrawMagicBeam(location, shootRay.origin + shootRay.direction * range);// Se establece la posición final de la línea del disparo en el punto más lejano del rayo dentro del rango especificado
+            DrawMagicBeam(
+                location,
+                shootRay.origin + shootRay.direction * range
+            );
         }
     }
+    IEnumerator DestroyObjectWithDelay(GameObject obj)
+    {
+        Animator objectAnimator = obj.GetComponent<Animator>();
 
+        if (objectAnimator != null)
+        {
+            objectAnimator.enabled = false;
+        }
+
+        yield return new WaitForSeconds(0.5f);
+
+        Destroy(obj);
+        
+    }
+    
     void DrawMagicBeam(Vector3 start, Vector3 end)
     {
         Vector3 direction = (end - start).normalized;
