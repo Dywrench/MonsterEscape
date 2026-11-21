@@ -17,6 +17,9 @@ public class PlayerController : MonoBehaviour
     private Animator anim;
     public GameObject power;
     public TextMeshProUGUI textCounter; 
+    // Particulas de curación
+    public GameObject healingEffect;
+    public GameObject healingParticles;
     void Start()
     {
         //se obtiene el componente de la esfera
@@ -26,6 +29,9 @@ public class PlayerController : MonoBehaviour
         //este metodo permite detener la emision de particulas al inicio del juego
         particlesSystem.Stop();
         // se inicializa el texto del contador en la UI
+        healingEffect.SetActive(false);
+        healingParticles.SetActive(false);
+
         textCounter.text = "Counter: " + counter.ToString(); 
         
     }
@@ -36,6 +42,10 @@ public class PlayerController : MonoBehaviour
         {   
             Animar();
         }
+        if (controls.Player.Heal.WasPressedThisFrame())
+        {
+            Curar();
+        }
     }
     void FixedUpdate()
     {
@@ -45,9 +55,11 @@ public class PlayerController : MonoBehaviour
     }
     void Awake()
     {
+
         controls = new InputSystem_Actions();
         anim = GetComponent<Animator>();
         controls.Player.Attack.ApplyBindingOverride("<Keyboard>/leftCtrl"); // se asigna la tecla Control para el ataque
+        controls.Player.Heal.ApplyBindingOverride("<Keyboard>/e");
         // enlaza al input de movimiento, es para detectar cuando el jugador mueve o deja de mover el control
         controls.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         controls.Player.Move.canceled += ctx => moveInput = Vector2.zero;
@@ -71,13 +83,34 @@ public class PlayerController : MonoBehaviour
         
         StartCoroutine(RestartAnimation());
     }
-    public IEnumerator RestartAnimation()
+
+    void Curar()
+    {
+        StartCoroutine(RestartHealingAnimation());
+    }
+
+        public IEnumerator RestartAnimation()
     {
         anim.SetBool("isSendingMagic", true);
         yield return new WaitForSecondsRealtime(1.0f); // espera 1 segundo y medio antes de reiniciar la animacion
         power.transform.position = transform.position;
         power.SendMessage("Shoot");
         anim.SetBool("isSendingMagic", false);  
+    }
+
+   public IEnumerator RestartHealingAnimation()
+    {
+        anim.SetBool("isHealing", true);
+
+        healingEffect.SetActive(true);
+        healingParticles.SetActive(true);
+
+        yield return new WaitForSecondsRealtime(5.1f); // espera 6 segundos antes de reiniciar la animacion
+
+        healingEffect.SetActive(false);
+        healingParticles.SetActive(false);
+
+        anim.SetBool("isHealing", false);
     }
 
     void OnTriggerEnter(Collider other)

@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class ShootController : MonoBehaviour
 {
+    
     public GameObject Player; //El objeto que representa al jugador en la escena
     public float TimeBetweenShooting = 1f;// Tiempo entre disparos
     public float range = 100f; // Rango del disparo
@@ -15,6 +16,10 @@ public class ShootController : MonoBehaviour
     float effectsDisplayTime = 1.2f; // Tiempo que se muestran los efectos del disparo
 
     private InputSystem_Actions controls; // Variable para manejar los controles de entrada
+    [SerializeField] private Transform LeftHandShootPoint;
+    [SerializeField] private int wavePoints = 20;
+    [SerializeField] private float waveAmplitude = 0.08f;
+    [SerializeField] private float waveFrequency = 5f;
 
     void Awake() // Se llama cuando el script se inicializa
     {
@@ -51,31 +56,47 @@ public class ShootController : MonoBehaviour
 
     void Shoot()
     {
-        Vector3 location = new Vector3( // Se define la posición del disparo
-            Player.transform.position.x, //al valor de la posición en x del jugador
-            Player.transform.position.y + 1.1f, //al valor de la posición en y del jugador se le suma 1.1 para que el disparo salga desde la altura del personaje
-            Player.transform.position.z //al valor de la posición en z del jugador
-        );
+       Vector3 location = LeftHandShootPoint.position;
 
         timer = 0f; // Se reinicia el temporizador para controlar el tiempo entre disparos
         gunLine.enabled = true; // Se habilita el componente LineRenderer para dibujar la línea del disparo
         gunLight.enabled = true; // Se habilita el componente Light para iluminar el disparo
         shootRay.origin = location; // Se establece el origen del rayo en la posición del disparo
         shootRay.direction = transform.forward; // Se establece la dirección del rayo hacia adelante desde el objeto que contiene este script
-        gunLine.SetPosition(0, location); //Se establece la posición inicial de la línea del disparo en la posición del disparo
 
         if (Physics.Raycast(shootRay, out shootHit, range, shootableMask)) // Se realiza un raycast para detectar si el rayo impacta con algún objeto disparable dentro del rango especificado
         {
             Destroy(shootHit.collider.gameObject); // Se destruye el objeto impactado por el rayo
-            gunLine.SetPosition(1, shootHit.point); // Se establece la posición final de la línea del disparo en el punto de impacto del rayo
+            DrawMagicBeam(location, shootHit.point);// Se establece la posición final de la línea del disparo en el punto de impacto del rayo
         }
         else //si el rayo no impacta con ningún objeto disparable dentro del rango especificado
         {
             Debug.Log("No se impacto con ningun objeto"); // Se imprime un mensaje en la consola indicando que no se impactó con ningún objeto
-            gunLine.SetPosition(1, shootRay.origin + shootRay.direction * range); // Se establece la posición final de la línea del disparo en el punto más lejano del rayo dentro del rango especificado
+            DrawMagicBeam(location, shootRay.origin + shootRay.direction * range);// Se establece la posición final de la línea del disparo en el punto más lejano del rayo dentro del rango especificado
         }
     }
 
+    void DrawMagicBeam(Vector3 start, Vector3 end)
+    {
+        Vector3 direction = (end - start).normalized;
+        Vector3 perpendicular = Vector3.Cross(direction, Vector3.up).normalized;
+
+        gunLine.positionCount = wavePoints;
+
+        for (int i = 0; i < wavePoints; i++)
+        {
+            float t = i / (float)(wavePoints - 1);
+
+            Vector3 position = Vector3.Lerp(start, end, t);
+
+            float wave = Mathf.Sin(t * waveFrequency * Mathf.PI * 2f)
+                        * waveAmplitude;
+
+            position += perpendicular * wave;
+
+            gunLine.SetPosition(i, position);
+        }
+    }
     void DisableEffects() //desactiva los efectos visuales del disparo
     {
         gunLine.enabled = false;  //se desactiva el componente LineRenderer para dejar de dibujar la línea del disparo
