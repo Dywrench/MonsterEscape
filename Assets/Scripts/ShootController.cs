@@ -2,7 +2,8 @@ using UnityEngine;
 using System.Collections;
 public class ShootController : MonoBehaviour
 {
-    
+    private AudioSource[] audioCollected;
+
     public GameObject Player; //El objeto que representa al jugador en la escena
     public float TimeBetweenShooting = 1f;// Tiempo entre disparos
     public float range = 100f; // Rango del disparo
@@ -23,20 +24,22 @@ public class ShootController : MonoBehaviour
 
     void Awake() // Se llama cuando el script se inicializa
     {
+        audioCollected = GetComponents<AudioSource>();
         shootableMask = LayerMask.GetMask("Shootable"); // Se obtiene la máscara de capa para los objetos disparables
         gunLine = GetComponent<LineRenderer>(); // Se obtiene el componente LineRenderer del objeto
         gunLight = GetComponent<Light>(); // Se obtiene el componente Light del objeto
-        controls = new InputSystem_Actions(); // Se inicializa la variable de controles de entrada
+        if (controls == null) controls = new InputSystem_Actions(); // Se inicializa la variable de controles de entrada
     }
 
     void OnEnable()
     {
-        controls.Enable(); // Se habilitan los controles de entrada cuando el objeto se activa
+        if (controls == null) controls = new InputSystem_Actions();
+        controls.Enable();
     }
 
     void OnDisable()
     {
-        controls.Disable(); // Se deshabilitan los controles de entrada cuando el objeto se desactiva
+        if (controls != null) controls.Disable();
     }
 
     void Update()
@@ -51,11 +54,13 @@ public class ShootController : MonoBehaviour
         if (controls.Player.Attack.WasPressedThisFrame()) // Se verifica si se ha presionado el botón de ataque en este frame
         {
             Shoot();
+            
         }
     }
 
     void Shoot()
     {
+        audioCollected[0].Play();
         Vector3 location = LeftHandShootPoint.position;
 
         timer = 0f;
@@ -96,15 +101,18 @@ public class ShootController : MonoBehaviour
                         playerController.StopDestroyParticles(effect)
                     );
                 }
+                
             }
             if (shootHit.collider.CompareTag("Enemy"))
             {
                 Destroy(shootHit.collider.gameObject);
+                audioCollected[1].Play();
             }
             else
             {
                 StartCoroutine(DestroyObjectWithDelay(shootHit.collider.gameObject));
             }
+            
         }
         else
         {
@@ -113,6 +121,7 @@ public class ShootController : MonoBehaviour
                 shootRay.origin + shootRay.direction * range
             );
         }
+        
     }
     IEnumerator DestroyObjectWithDelay(GameObject obj)
     {

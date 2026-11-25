@@ -57,26 +57,35 @@ public class PlayerController : MonoBehaviour
         Vector3 movement = new Vector3(moveInput.x, 0.0f, moveInput.y); //movement input ayuda pa que se genere una fuerza en la esfera
         rb.AddForce(movement * speed);//llama metodo Addforce (añadir fuerza a la direccion del movimiento) del metodo rb (rigidbody) */
     }
-    void Awake()
+        void Awake()
     {
+        InitializeControls();
+        anim = GetComponent<Animator>();
+    }
+
+    private void InitializeControls()
+    {
+        if (controls != null) return;
 
         controls = new InputSystem_Actions();
-        anim = GetComponent<Animator>();
-        controls.Player.Attack.ApplyBindingOverride("<Keyboard>/leftCtrl"); // se asigna la tecla Control para el ataque
+        controls.Player.Attack.ApplyBindingOverride("<Keyboard>/leftCtrl");
         controls.Player.Heal.ApplyBindingOverride("<Keyboard>/e");
-        // enlaza al input de movimiento, es para detectar cuando el jugador mueve o deja de mover el control
         controls.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         controls.Player.Move.canceled += ctx => moveInput = Vector2.zero;
     }
+
     void OnEnable()
     {
+        InitializeControls();
         controls.Enable();
     }
+
     void OnDisable()
     {
-        controls.Disable();
+        if (controls != null) controls.Disable();
     }
-    public IEnumerator StopParticles(ParticleSystem particleSystem)
+
+public IEnumerator StopParticles(ParticleSystem particleSystem)
     {
         yield return new WaitForSeconds(1f); // espera 1 segundo antes de detener el sistema de particulas
         particlesSystem.Stop();
