@@ -1,9 +1,11 @@
 using UnityEngine;
 using System.Collections;
+using TMPro;
 public class ShootController : MonoBehaviour
 {
     private AudioSource[] audioCollected;
-
+    public TextMeshProUGUI textCounter; 
+    private int counter;
     public GameObject Player; //El objeto que representa al jugador en la escena
     public float TimeBetweenShooting = 1f;// Tiempo entre disparos
     public float range = 100f; // Rango del disparo
@@ -29,6 +31,7 @@ public class ShootController : MonoBehaviour
         gunLine = GetComponent<LineRenderer>(); // Se obtiene el componente LineRenderer del objeto
         gunLight = GetComponent<Light>(); // Se obtiene el componente Light del objeto
         if (controls == null) controls = new InputSystem_Actions(); // Se inicializa la variable de controles de entrada
+        textCounter.text = "Dragones Eliminados: " + counter.ToString(); 
     }
 
     void OnEnable()
@@ -106,6 +109,8 @@ public class ShootController : MonoBehaviour
             if (shootHit.collider.CompareTag("Enemy"))
             {
                 Destroy(shootHit.collider.gameObject);
+                counter++;
+                textCounter.text = "Dragones Eliminados: " + counter.ToString();
                 audioCollected[1].Play();
             }
             else
