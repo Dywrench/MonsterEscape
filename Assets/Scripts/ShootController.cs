@@ -4,11 +4,14 @@ using TMPro;
 public class ShootController : MonoBehaviour
 {
     private AudioSource[] audioCollected;
-    public TextMeshProUGUI textCounter; 
+    public TextMeshProUGUI textCounter;
+    public TextMeshProUGUI textVaseCounter;
+    private int vaseCounter; 
     private int counter;
     public GameObject Player; //El objeto que representa al jugador en la escena
     public float TimeBetweenShooting = 1f;// Tiempo entre disparos
     public float range = 100f; // Rango del disparo
+    public GameObject door;
 
     float timer; // Temporizador para controlar el tiempo entre disparos
     Ray shootRay; // Rayo que representa la dirección del disparo
@@ -30,8 +33,13 @@ public class ShootController : MonoBehaviour
         shootableMask = LayerMask.GetMask("Shootable"); // Se obtiene la máscara de capa para los objetos disparables
         gunLine = GetComponent<LineRenderer>(); // Se obtiene el componente LineRenderer del objeto
         gunLight = GetComponent<Light>(); // Se obtiene el componente Light del objeto
-        if (controls == null) controls = new InputSystem_Actions(); // Se inicializa la variable de controles de entrada
-        textCounter.text = "Dragones Eliminados: " + counter.ToString(); 
+        if (controls == null){
+        controls = new InputSystem_Actions();
+        }
+        if (textCounter != null)
+            textCounter.text = "Dragones Eliminados: " + counter;
+        if (textVaseCounter != null)
+            textVaseCounter.text = "Jarrones Destruidos: " + vaseCounter;
     }
 
     void OnEnable()
@@ -62,73 +70,110 @@ public class ShootController : MonoBehaviour
     }
 
     void Shoot()
-    {
+{
+    if (audioCollected != null && audioCollected.Length > 0)
         audioCollected[0].Play();
-        Vector3 location = LeftHandShootPoint.position;
+    Vector3 location = LeftHandShootPoint != null ? LeftHandShootPoint.position : transform.position;
 
-        timer = 0f;
-        gunLine.enabled = true;
-        gunLight.enabled = true;
+    timer = 0f;
+    if (gunLine != null) gunLine.enabled = true;
+    if (gunLight != null) gunLight.enabled = true;
 
-        shootRay.origin = location;
-        shootRay.direction = transform.forward;
+    shootRay.origin = location;
+    shootRay.direction = transform.forward;
 
-        if (Physics.Raycast(shootRay, out shootHit, range, shootableMask))
+    if (Physics.Raycast(shootRay, out shootHit, range, shootableMask))
+    {
+        DrawMagicBeam(location, shootHit.point);
+
+        PlayerController playerController = Player != null ? Player.GetComponent<PlayerController>() : null;
+
+        if (playerController != null)
         {
-            DrawMagicBeam(location, shootHit.point);
+            GameObject particles = null;
 
-            PlayerController playerController = Player.GetComponent<PlayerController>();
-
-            if (playerController != null)
-            {
-                GameObject particles = null;
-
-                if (shootHit.collider.CompareTag("Enemy"))
-                {
-                    particles = playerController.enemyDestroyParticles;
-                }
-                else
-                {
-                    particles = playerController.objectDestroyParticles;
-                }
-
-                if (particles != null)
-                {
-                    GameObject effect = Instantiate(
-                        particles,
-                        shootHit.point,
-                        Quaternion.identity
-                    );
-
-                    StartCoroutine(
-                        playerController.StopDestroyParticles(effect)
-                    );
-                }
-                
-            }
             if (shootHit.collider.CompareTag("Enemy"))
             {
-                Destroy(shootHit.collider.gameObject);
-                counter++;
-                textCounter.text = "Dragones Eliminados: " + counter.ToString();
-                audioCollected[1].Play();
+                particles = playerController.enemyDestroyParticles;
             }
             else
             {
-                StartCoroutine(DestroyObjectWithDelay(shootHit.collider.gameObject));
+                particles = playerController.objectDestroyParticles;
             }
-            
+
+            if (particles != null)
+            {
+                GameObject effect = Instantiate(
+                    particles,
+                    shootHit.point,
+                    Quaternion.identity
+                );
+
+                StartCoroutine(
+                    playerController.StopDestroyParticles(effect)
+                );
+            }
+        }
+
+        // Verificar si el objeto es un dragón o un jarrón
+        if (shootHit.collider.CompareTag("Enemy") ||
+            shootHit.collider.CompareTag("vase"))
+        {
+            ObjectResistance objectResistance =
+                shootHit.collider.GetComponent<ObjectResistance>();
+
+            if (objectResistance == null)
+            {
+                objectResistance =
+                    shootHit.collider.GetComponentInParent<ObjectResistance>();
+            }
+
+            if (objectResistance != null)
+            {
+                objectResistance.ReceiveHit(shootHit.collider.tag, this);
+            }
+            else
+            {
+                StartCoroutine(DestroyObjectWithDelay(shootHit.collider.gameObject, shootHit.collider.tag));
+            }
         }
         else
         {
-            DrawMagicBeam(
-                location,
-                shootRay.origin + shootRay.direction * range
-            );
+            StartCoroutine(DestroyObjectWithDelay(shootHit.collider.gameObject, shootHit.collider.tag));
         }
-        
     }
-    IEnumerator DestroyObjectWithDelay(GameObject obj)
+    else
+    {
+        DrawMagicBeam(
+            location,
+            shootRay.origin + shootRay.direction * range
+        );
+    }
+}
+
+public void RegisterDestroyedObject(string objectTag)
+{
+    if (objectTag == "Enemy")
+    {
+        counter++;
+        if (textCounter != null)
+            textCounter.text = "Dragones Eliminados: " + counter;
+        if (audioCollected != null && audioCollected.Length > 1)
+            audioCollected[1].Play();
+    }
+    else if (objectTag == "vase")
+    {
+        vaseCounter++;
+        if (textVaseCounter != null)
+            textVaseCounter.text = "Jarrones Destruidos: " + vaseCounter;
+
+        if (vaseCounter >= 5 && door != null){
+            door.SetActive(false);
+        }
+    }
+}
+
+    IEnumerator DestroyObjectWithDelay(GameObject obj, string objectTag)
     {
         Animator objectAnimator = obj.GetComponent<Animator>();
 
@@ -139,12 +184,16 @@ public class ShootController : MonoBehaviour
 
         yield return new WaitForSeconds(0.5f);
 
+        RegisterDestroyedObject(objectTag);
         Destroy(obj);
         
     }
     
     void DrawMagicBeam(Vector3 start, Vector3 end)
     {
+        if (gunLine == null) return;
+        if (wavePoints < 2) wavePoints = 2;
+
         Vector3 direction = (end - start).normalized;
         Vector3 perpendicular = Vector3.Cross(direction, Vector3.up).normalized;
 
@@ -166,7 +215,7 @@ public class ShootController : MonoBehaviour
     }
     void DisableEffects() //desactiva los efectos visuales del disparo
     {
-        gunLine.enabled = false;  //se desactiva el componente LineRenderer para dejar de dibujar la línea del disparo
-        gunLight.enabled = false; //se desactiva el componente Light para dejar de iluminar el disparo
+        if (gunLine != null) gunLine.enabled = false;  //se desactiva el componente LineRenderer para dejar de dibujar la línea del disparo
+        if (gunLight != null) gunLight.enabled = false; //se desactiva el componente Light para dejar de iluminar el disparo
     }
 }
