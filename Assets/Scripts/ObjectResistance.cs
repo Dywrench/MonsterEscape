@@ -7,7 +7,7 @@ public class ObjectResistance : MonoBehaviour
     private int currentHits;
     private bool isDestroyed;
 
-    void Start()
+    void Awake()
     {
         resistance = Random.Range(2, 6);
         currentHits = 0;
@@ -42,6 +42,7 @@ public class ObjectResistance : MonoBehaviour
 
         if (shootController != null)
         {
+            shootController.PlayDestroyParticles(objectTag, transform.position);
             shootController.RegisterDestroyedObject(objectTag);
         }
 

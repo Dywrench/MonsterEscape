@@ -8,6 +8,8 @@ TagManager:
   - CinemachineTarget
   - Enemy
   - vase
+  - Lava
+  - PlataformaCaminable
   layers:
   - Default
   - TransparentFX

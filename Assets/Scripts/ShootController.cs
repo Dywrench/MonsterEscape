@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 public class ShootController : MonoBehaviour
 {
@@ -14,6 +15,7 @@ public class ShootController : MonoBehaviour
     public GameObject door;
 
     float timer; // Temporizador para controlar el tiempo entre disparos
+    private float nextShotTime;
     Ray shootRay; // Rayo que representa la dirección del disparo
     RaycastHit shootHit; // Información sobre el objeto impactado por el rayo
     int shootableMask; // Máscara de capa para determinar qué objetos pueden ser disparados (unity lo asigna como int, por eso le ponemos int)
@@ -26,6 +28,7 @@ public class ShootController : MonoBehaviour
     [SerializeField] private int wavePoints = 20;
     [SerializeField] private float waveAmplitude = 0.08f;
     [SerializeField] private float waveFrequency = 5f;
+    private readonly HashSet<int> objectsPendingDestruction = new HashSet<int>();
 
     void Awake() // Se llama cuando el script se inicializa
     {
@@ -71,6 +74,9 @@ public class ShootController : MonoBehaviour
 
     void Shoot()
 {
+    if (Time.time < nextShotTime) return;
+    nextShotTime = Time.time + TimeBetweenShooting;
+
     if (audioCollected != null && audioCollected.Length > 0)
         audioCollected[0].Play();
     Vector3 location = LeftHandShootPoint != null ? LeftHandShootPoint.position : transform.position;
@@ -86,35 +92,6 @@ public class ShootController : MonoBehaviour
     {
         DrawMagicBeam(location, shootHit.point);
 
-        PlayerController playerController = Player != null ? Player.GetComponent<PlayerController>() : null;
-
-        if (playerController != null)
-        {
-            GameObject particles = null;
-
-            if (shootHit.collider.CompareTag("Enemy"))
-            {
-                particles = playerController.enemyDestroyParticles;
-            }
-            else
-            {
-                particles = playerController.objectDestroyParticles;
-            }
-
-            if (particles != null)
-            {
-                GameObject effect = Instantiate(
-                    particles,
-                    shootHit.point,
-                    Quaternion.identity
-                );
-
-                StartCoroutine(
-                    playerController.StopDestroyParticles(effect)
-                );
-            }
-        }
-
         // Verificar si el objeto es un dragón o un jarrón
         if (shootHit.collider.CompareTag("Enemy") ||
             shootHit.collider.CompareTag("vase"))
@@ -126,6 +103,23 @@ public class ShootController : MonoBehaviour
             {
                 objectResistance =
                     shootHit.collider.GetComponentInParent<ObjectResistance>();
+            }
+
+            if (objectResistance == null && shootHit.collider.CompareTag("Enemy"))
+            {
+                Transform enemyRoot = shootHit.collider.transform;
+                for (Transform parent = enemyRoot.parent;
+                     parent != null;
+                     parent = parent.parent)
+                {
+                    if (parent.CompareTag("Enemy"))
+                    {
+                        enemyRoot = parent;
+                    }
+                }
+
+                objectResistance =
+                    enemyRoot.gameObject.AddComponent<ObjectResistance>();
             }
 
             if (objectResistance != null)
@@ -149,6 +143,23 @@ public class ShootController : MonoBehaviour
             shootRay.origin + shootRay.direction * range
         );
     }
+}
+
+public void PlayDestroyParticles(string objectTag, Vector3 position)
+{
+    PlayerController playerController =
+        Player != null ? Player.GetComponent<PlayerController>() : null;
+
+    if (playerController == null) return;
+
+    GameObject particles = objectTag == "Enemy"
+        ? playerController.enemyDestroyParticles
+        : playerController.objectDestroyParticles;
+
+    if (particles == null) return;
+
+    GameObject effect = Instantiate(particles, position, Quaternion.identity);
+    StartCoroutine(playerController.StopDestroyParticles(effect));
 }
 
 public void RegisterDestroyedObject(string objectTag)
@@ -175,6 +186,11 @@ public void RegisterDestroyedObject(string objectTag)
 
     IEnumerator DestroyObjectWithDelay(GameObject obj, string objectTag)
     {
+        if (obj == null) yield break;
+
+        int objectId = obj.GetInstanceID();
+        if (!objectsPendingDestruction.Add(objectId)) yield break;
+
         Animator objectAnimator = obj.GetComponent<Animator>();
 
         if (objectAnimator != null)
@@ -184,9 +200,16 @@ public void RegisterDestroyedObject(string objectTag)
 
         yield return new WaitForSeconds(0.5f);
 
+        if (obj == null)
+        {
+            objectsPendingDestruction.Remove(objectId);
+            yield break;
+        }
+
+        PlayDestroyParticles(objectTag, obj.transform.position);
         RegisterDestroyedObject(objectTag);
         Destroy(obj);
-        
+        objectsPendingDestruction.Remove(objectId);
     }
     
     void DrawMagicBeam(Vector3 start, Vector3 end)

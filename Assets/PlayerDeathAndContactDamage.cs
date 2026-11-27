@@ -13,12 +13,17 @@ public class PlayerDeathAndContactDamage : MonoBehaviour
     [SerializeField, Min(0.1f)] private float damageInterval = 1f;
     [SerializeField, Min(0f)] private float restartDelay = 2f;
     private AudioSource audioCollected;
+    private CharacterController characterController;
+    private StarterAssets.ThirdPersonController thirdPersonController;
+    private readonly Collider[] nearbyColliders = new Collider[16];
     private float nextDamageTime;
     private bool isEliminated;
 
     private void Awake()
     {
         audioCollected = GetComponent<AudioSource>();
+        characterController = GetComponent<CharacterController>();
+        thirdPersonController = GetComponent<StarterAssets.ThirdPersonController>();
         if (health == null) health = GetComponent<Health>();
         UpdateHealthText();
     }
@@ -37,6 +42,7 @@ public class PlayerDeathAndContactDamage : MonoBehaviour
     private void Update()
     {
         UpdateHealthText();
+        DamageOverlappingEnemy();
     }
 
     private void UpdateHealthText()
@@ -47,12 +53,60 @@ public class PlayerDeathAndContactDamage : MonoBehaviour
 
     private void OnControllerColliderHit(ControllerColliderHit hit)
     {
+        TrackMovingPlatform(hit);
+        TryApplyContactDamage(hit.collider.transform);
+    }
+
+    private void DamageOverlappingEnemy()
+    {
+        if (isEliminated || health == null || characterController == null ||
+            Time.time < nextDamageTime)
+            return;
+
+        Bounds bounds = characterController.bounds;
+        float radius = Mathf.Min(bounds.extents.x, bounds.extents.z) +
+            characterController.skinWidth;
+        float halfSegment = Mathf.Max(0f, bounds.extents.y - radius);
+        Vector3 segmentOffset = Vector3.up * halfSegment;
+        int colliderCount = Physics.OverlapCapsuleNonAlloc(
+            bounds.center - segmentOffset,
+            bounds.center + segmentOffset,
+            radius,
+            nearbyColliders,
+            Physics.AllLayers,
+            QueryTriggerInteraction.Collide
+        );
+
+        for (int i = 0; i < colliderCount; i++)
+        {
+            if (nearbyColliders[i] != null)
+                TryApplyContactDamage(nearbyColliders[i].transform);
+
+            if (Time.time < nextDamageTime)
+                return;
+        }
+    }
+
+    private void TryApplyContactDamage(Transform candidate)
+    {
         if (isEliminated || health == null || Time.time < nextDamageTime) return;
-        if (!HasEnemyTag(hit.collider.transform)) return;
+        if (!HasEnemyTag(candidate)) return;
 
         health.ApplyDamage(damagePerHit);
         nextDamageTime = Time.time + damageInterval;
-        audioCollected.Play();
+        if (audioCollected != null) audioCollected.Play();
+    }
+
+    private void TrackMovingPlatform(ControllerColliderHit hit)
+    {
+        if (thirdPersonController == null || hit.normal.y < 0.5f) return;
+
+        PlatformMovementX platform =
+            hit.collider.GetComponentInParent<PlatformMovementX>();
+
+        thirdPersonController.SetMovingPlatform(
+            platform != null ? platform.transform : null
+        );
     }
 
     private static bool HasEnemyTag(Transform candidate)

@@ -105,6 +105,9 @@ namespace StarterAssets
         private CharacterController _controller;
         private StarterAssetsInputs _input;
         private GameObject _mainCamera;
+        private Transform _movingPlatform;
+        private Vector3 _lastPlatformPosition;
+        private Vector3 _lastPlatformVelocity;
 
         private const float _threshold = 0.01f;
 
@@ -183,6 +186,11 @@ namespace StarterAssets
             Grounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers,
                 QueryTriggerInteraction.Ignore);
 
+            if (!Grounded)
+            {
+                _movingPlatform = null;
+            }
+
             // update animator if using character
             if (_hasAnimator)
             {
@@ -213,6 +221,14 @@ namespace StarterAssets
 
         private void Move()
         {
+            Vector3 platformDelta = Vector3.zero;
+            if (_movingPlatform != null && Grounded)
+            {
+                Vector3 platformPosition = _movingPlatform.transform.position;
+                platformDelta = platformPosition - _lastPlatformPosition;
+                _lastPlatformPosition = platformPosition;
+            }
+
             // set target speed based on move speed, sprint speed and if sprint is pressed
             float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
 
@@ -223,7 +239,9 @@ namespace StarterAssets
             if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
             // a reference to the players current horizontal velocity
-            float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
+            Vector3 characterVelocity = _controller.velocity - _lastPlatformVelocity;
+            float currentHorizontalSpeed =
+                new Vector3(characterVelocity.x, 0.0f, characterVelocity.z).magnitude;
 
             float speedOffset = 0.1f;
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
@@ -269,7 +287,11 @@ namespace StarterAssets
 
             // move the player
             _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) +
-                             new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+                             new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime +
+                             platformDelta);
+            _lastPlatformVelocity = Time.deltaTime > 0f
+                ? platformDelta / Time.deltaTime
+                : Vector3.zero;
 
             // update animator if using character
             if (_hasAnimator)
@@ -277,6 +299,15 @@ namespace StarterAssets
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
                 _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
             }
+        }
+
+        public void SetMovingPlatform(Transform platform)
+        {
+            if (platform == _movingPlatform) return;
+
+            _movingPlatform = platform;
+            if (_movingPlatform != null)
+                _lastPlatformPosition = _movingPlatform.position;
         }
 
         private void JumpAndGravity()
@@ -388,5 +419,6 @@ namespace StarterAssets
                 AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
             }
         }
+
     }
 }

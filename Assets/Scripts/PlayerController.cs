@@ -2,8 +2,12 @@ using UnityEngine;
 using TMPro;
 using System.Collections;
 using UnityEngine.InputSystem;
+using Ilumisoft.HealthSystem;
 public class PlayerController : MonoBehaviour
 {
+    private const float HealingDuration = 3f;
+    private const float HealingCooldown = 10f;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     private InputSystem_Actions controls;
     public float speed;
@@ -20,6 +24,8 @@ public class PlayerController : MonoBehaviour
     // Particulas de curación
     public GameObject healingEffect;
     public GameObject healingParticles;
+    private bool isHealing;
+    private float nextHealTime;
     // Partículas al destruir objetos
     public GameObject objectDestroyParticles;
     // Partículas al destruir enemigos
@@ -113,7 +119,8 @@ public IEnumerator StopParticles(ParticleSystem particleSystem)
 
     void Curar()
     {
-        StartCoroutine(RestartHealingAnimation());
+        if (!isHealing && Time.time >= nextHealTime)
+            StartCoroutine(RestartHealingAnimation());
     }
 
         public IEnumerator RestartAnimation()
@@ -127,22 +134,70 @@ public IEnumerator StopParticles(ParticleSystem particleSystem)
 
    public IEnumerator RestartHealingAnimation()
     {
+        if (isHealing || Time.time < nextHealTime)
+            yield break;
+
+        Health health = GetComponent<Health>();
+        if (health == null)
+        {
+            Debug.LogError(
+                "PlayerController needs a Health component to heal.",
+                this
+            );
+            yield break;
+        }
+
+        if (!health.IsAlive)
+            yield break;
+
+        nextHealTime = Time.time + HealingCooldown;
+        isHealing = true;
         anim.SetBool("isHealing", true);
 
         healingEffect.SetActive(true);
         healingParticles.SetActive(true);
 
-        yield return new WaitForSecondsRealtime(5.1f); // espera 6 segundos antes de reiniciar la animacion
+        float elapsed = 0f;
+        while (elapsed < HealingDuration && health.IsAlive)
+        {
+            float deltaTime = Time.unscaledDeltaTime;
+            float remainingDuration = HealingDuration - elapsed;
+            float missingHealth = health.MaxHealth - health.CurrentHealth;
+
+            health.AddHealth(missingHealth * (deltaTime / remainingDuration));
+            elapsed += deltaTime;
+            yield return null;
+        }
+
+        if (health.IsAlive)
+            health.SetHealth(health.MaxHealth);
 
         healingEffect.SetActive(false);
         healingParticles.SetActive(false);
 
         anim.SetBool("isHealing", false);
+        isHealing = false;
     }
 
     void OnTriggerEnter(Collider other)
     {
-          // el objeto es recolectable
+        if (HasTagInHierarchy(other.transform, "Lava"))
+        {
+            Health health = GetComponent<Health>();
+            if (health == null)
+            {
+                Debug.LogError(
+                    "PlayerController needs a Health component to handle lava.",
+                    this
+                );
+                return;
+            }
+
+            if (health.IsAlive)
+                health.ApplyDamage(health.CurrentHealth);
+            return;
+        }
+
         if (other.gameObject.CompareTag("Collectable"))
         {
             // obtiene la posicion del objeto recolectable
@@ -160,6 +215,17 @@ public IEnumerator StopParticles(ParticleSystem particleSystem)
         {
            
         }   
+    }
+
+    private static bool HasTagInHierarchy(Transform candidate, string tag)
+    {
+        while (candidate != null)
+        {
+            if (candidate.CompareTag(tag)) return true;
+            candidate = candidate.parent;
+        }
+
+        return false;
     }
 
     
