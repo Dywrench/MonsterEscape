@@ -42,10 +42,20 @@ public class ObjectResistance : MonoBehaviour
 
         if (shootController != null)
         {
-            shootController.PlayDestroyParticles(objectTag, transform.position);
-            shootController.RegisterDestroyedObject(objectTag);
+            shootController.CompleteObjectHit(gameObject, objectTag);
         }
+        else if (objectTag == "vase")
+        {
+            MeshRenderer meshRenderer = GetComponent<MeshRenderer>();
+            if (meshRenderer != null)
+                meshRenderer.enabled = false;
 
-        Destroy(gameObject);
+            foreach (Collider objectCollider in GetComponents<Collider>())
+                objectCollider.enabled = false;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }

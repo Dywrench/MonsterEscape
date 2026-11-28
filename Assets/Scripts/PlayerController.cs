@@ -30,6 +30,7 @@ public class PlayerController : MonoBehaviour
     public GameObject objectDestroyParticles;
     // Partículas al destruir enemigos
     public GameObject enemyDestroyParticles;
+    [SerializeField] private ParticleSystem shootParticles;
     void Start()
     {
         //se obtiene el componente de la esfera
@@ -51,6 +52,7 @@ public class PlayerController : MonoBehaviour
         if (controls.Player.Attack.WasPressedThisFrame())
         {   
             Animar();
+            PlayShootParticles();
         }
         if (controls.Player.Heal.WasPressedThisFrame())
         {
@@ -131,8 +133,35 @@ public IEnumerator StopParticles(ParticleSystem particleSystem)
         power.SendMessage("Shoot");
         anim.SetBool("isSendingMagic", false);  
     }
+    public void PlayShootParticles()
+    {
+        if (shootParticles != null)
+        {
+            StopCoroutine(nameof(StopShootParticles));
 
-   public IEnumerator RestartHealingAnimation()
+            shootParticles.Stop(
+                true,
+                ParticleSystemStopBehavior.StopEmittingAndClear
+            );
+
+            shootParticles.Play();
+
+            StartCoroutine(StopShootParticles());
+        }
+    }
+
+private IEnumerator StopShootParticles()
+{
+    yield return new WaitForSeconds(1.3f);
+
+    if (shootParticles != null)
+    {
+        shootParticles.Stop(
+            true,
+            ParticleSystemStopBehavior.StopEmittingAndClear
+        );
+    }
+}   public IEnumerator RestartHealingAnimation()
     {
         if (isHealing || Time.time < nextHealTime)
             yield break;
@@ -216,6 +245,7 @@ public IEnumerator StopParticles(ParticleSystem particleSystem)
            
         }   
     }
+    
 
     private static bool HasTagInHierarchy(Transform candidate, string tag)
     {

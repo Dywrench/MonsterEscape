@@ -12,7 +12,7 @@ public class ShootController : MonoBehaviour
     public GameObject Player; //El objeto que representa al jugador en la escena
     public float TimeBetweenShooting = 1f;// Tiempo entre disparos
     public float range = 100f; // Rango del disparo
-    public GameObject door;
+    public GameObject door1;
 
     float timer; // Temporizador para controlar el tiempo entre disparos
     private float nextShotTime;
@@ -178,10 +178,33 @@ public void RegisterDestroyedObject(string objectTag)
         if (textVaseCounter != null)
             textVaseCounter.text = "Jarrones Destruidos: " + vaseCounter;
 
-        if (vaseCounter >= 5 && door != null){
-            door.SetActive(false);
+        if (vaseCounter >= 5 && door1 != null){
+            Destroy(door1);
+            door1 = null;
         }
     }
+}
+
+public void CompleteObjectHit(GameObject obj, string objectTag)
+{
+    if (obj == null) return;
+
+    PlayDestroyParticles(objectTag, obj.transform.position);
+    RegisterDestroyedObject(objectTag);
+
+    if (objectTag == "vase")
+    {
+        MeshRenderer meshRenderer = obj.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+            meshRenderer.enabled = false;
+
+        foreach (Collider objectCollider in obj.GetComponents<Collider>())
+            objectCollider.enabled = false;
+
+        return;
+    }
+
+    Destroy(obj);
 }
 
     IEnumerator DestroyObjectWithDelay(GameObject obj, string objectTag)
@@ -206,9 +229,7 @@ public void RegisterDestroyedObject(string objectTag)
             yield break;
         }
 
-        PlayDestroyParticles(objectTag, obj.transform.position);
-        RegisterDestroyedObject(objectTag);
-        Destroy(obj);
+        CompleteObjectHit(obj, objectTag);
         objectsPendingDestruction.Remove(objectId);
     }
     
