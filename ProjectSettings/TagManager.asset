@@ -11,6 +11,7 @@ TagManager:
   - door
   - Lava
   - PlataformaCaminable
+  - rock
   layers:
   - Default
   - TransparentFX

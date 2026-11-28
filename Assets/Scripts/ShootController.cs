@@ -94,7 +94,8 @@ public class ShootController : MonoBehaviour
 
         // Verificar si el objeto es un dragón o un jarrón
         if (shootHit.collider.CompareTag("Enemy") ||
-            shootHit.collider.CompareTag("vase"))
+            shootHit.collider.CompareTag("vase") ||
+            shootHit.collider.CompareTag("rock"))
         {
             ObjectResistance objectResistance =
                 shootHit.collider.GetComponent<ObjectResistance>();
